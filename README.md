@@ -41,7 +41,12 @@ examples/       # runnable strategy studies with written conclusions
 
 ## Status
 
-Early scaffold. Module structure and interfaces are being laid out; implementation to follow.
+In development. Implemented so far:
+
+- **metrics** — annualized return/volatility, Sharpe, max drawdown, hit rate, turnover (unit tested)
+- **execution** — transaction-cost models: `ZeroCost` baseline and `BpsCost` (commission + slippage, unit tested)
+
+Up next: the core engine loop (signals → positions → net P&L).
 
 ## Getting started
 
