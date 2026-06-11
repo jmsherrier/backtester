@@ -44,8 +44,9 @@ examples/       # runnable strategy studies with written conclusions
 In development. Implemented so far:
 
 - **metrics** — annualized return/volatility, Sharpe, max drawdown, hit rate, turnover (unit tested)
+- **execution** — transaction-cost models: `ZeroCost` baseline and `BpsCost` (commission + slippage, unit tested)
 
-Up next: transaction-cost models, then the core engine loop.
+Up next: the core engine loop (signals → positions → net P&L).
 
 ## Getting started
 
