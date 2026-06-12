@@ -51,8 +51,11 @@ In development. Implemented so far:
   truncation-invariance test proving the signal at *t* cannot see past *t*
 - **data** — strict CSV price loading (reject-don't-repair: no forward-fill, no silent
   dedup), price→return conversion, and a seeded GBM generator for runnable examples
+- **examples** — `momentum_study.py`: the full pipeline on synthetic random-walk data,
+  where the correct answer is *no edge* — a built-in honesty check (run it:
+  `python examples/momentum_study.py`, or point it at your own data with `--csv`)
 
-Up next: the first end-to-end strategy study in `examples/`.
+Up next: train/test separation and the first out-of-sample study on real data.
 
 ## Getting started
 
