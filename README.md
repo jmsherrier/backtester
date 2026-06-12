@@ -47,8 +47,10 @@ In development. Implemented so far:
 - **execution** — transaction-cost models: `ZeroCost` baseline and `BpsCost` (commission + slippage, unit tested)
 - **engine** — the core loop: signal → lagged position → gross → net returns. The no-lookahead
   and cost-reconciliation guarantees are executable tests, not just claims
+- **signals** — time-series momentum (trailing compounded return sign), with a
+  truncation-invariance test proving the signal at *t* cannot see past *t*
 
-Up next: signal generators (momentum first) and the data layer.
+Up next: the data layer, then the first end-to-end strategy study.
 
 ## Getting started
 
