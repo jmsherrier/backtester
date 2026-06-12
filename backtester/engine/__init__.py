@@ -5,3 +5,10 @@ positions, trades, gross P&L, costs, and net P&L. The loop is deliberately simpl
 and auditable: positions are formed from lagged signals so that returns earned on
 date t come from positions decided using only data through t-1.
 """
+
+from backtester.engine.backtest import BacktestResult, run_backtest
+
+__all__ = [
+    "BacktestResult",
+    "run_backtest",
+]

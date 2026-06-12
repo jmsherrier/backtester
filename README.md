@@ -45,8 +45,10 @@ In development. Implemented so far:
 
 - **metrics** — annualized return/volatility, Sharpe, max drawdown, hit rate, turnover (unit tested)
 - **execution** — transaction-cost models: `ZeroCost` baseline and `BpsCost` (commission + slippage, unit tested)
+- **engine** — the core loop: signal → lagged position → gross → net returns. The no-lookahead
+  and cost-reconciliation guarantees are executable tests, not just claims
 
-Up next: the core engine loop (signals → positions → net P&L).
+Up next: signal generators (momentum first) and the data layer.
 
 ## Getting started
 
