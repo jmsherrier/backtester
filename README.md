@@ -12,8 +12,8 @@ and to be transparent when it would not.
 
 ## Why this exists
 
-Most student backtests quietly cheat: they use lookahead information, ignore transaction
-costs, or report in-sample performance as if it were predictive. This engine is built to
+Avoiding: using lookahead information, ignoring transaction
+costs, or reporting in-sample performance as if it were predictive. This engine is built to
 make those mistakes hard:
 
 - **No lookahead by construction** — signals at time *t* may only use data available at *t*.
