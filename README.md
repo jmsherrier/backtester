@@ -45,15 +45,24 @@ In development. Implemented so far:
 
 - **metrics** — annualized return/volatility, Sharpe, max drawdown, hit rate, turnover (unit tested)
 - **execution** — transaction-cost models: `ZeroCost` baseline and `BpsCost` (commission + slippage, unit tested)
+- **engine** — the core loop: signal → lagged position → gross → net returns. The no-lookahead
+  and cost-reconciliation guarantees are executable tests, not just claims
+- **signals** — time-series momentum (trailing compounded return sign), with a
+  truncation-invariance test proving the signal at *t* cannot see past *t*
+- **data** — strict CSV price loading (reject-don't-repair: no forward-fill, no silent
+  dedup), price→return conversion, and a seeded GBM generator for runnable examples
+- **examples** — `momentum_study.py`: the full pipeline on synthetic random-walk data,
+  where the correct answer is *no edge* — a built-in honesty check (run it:
+  `python examples/momentum_study.py`, or point it at your own data with `--csv`)
 
-Up next: the core engine loop (signals → positions → net P&L).
+Up next: train/test separation and the first out-of-sample study on real data.
 
 ## Getting started
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate        # Windows
-pip install -r requirements.txt
+pip install -e .[dev]          # editable install + test deps
 pytest                         # run the test suite
 ```
 
