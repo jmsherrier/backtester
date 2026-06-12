@@ -49,8 +49,10 @@ In development. Implemented so far:
   and cost-reconciliation guarantees are executable tests, not just claims
 - **signals** — time-series momentum (trailing compounded return sign), with a
   truncation-invariance test proving the signal at *t* cannot see past *t*
+- **data** — strict CSV price loading (reject-don't-repair: no forward-fill, no silent
+  dedup), price→return conversion, and a seeded GBM generator for runnable examples
 
-Up next: the data layer, then the first end-to-end strategy study.
+Up next: the first end-to-end strategy study in `examples/`.
 
 ## Getting started
 
