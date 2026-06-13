@@ -56,10 +56,16 @@ In development. Implemented so far:
   `python examples/momentum_study.py`, or point it at your own data with `--csv`)
 - **validation** — chronological train/test splits (`split_by_fraction`, `split_by_date`):
   every train date precedes every test date, the pieces concatenate back to the original
-  exactly, and degenerate splits raise instead of returning in-sample data as "out-of-sample"
+  exactly, and degenerate splits raise instead of returning in-sample data as "out-of-sample".
+  Plus `out_of_sample_study`: select a candidate by net Sharpe on the train window, touch
+  the test window exactly once, report both numbers so the degradation is the headline
+- **examples** — `oos_momentum_study.py`: fits the momentum lookback in-sample on synthetic
+  random-walk data and watches the "edge" evaporate out of sample (in-sample Sharpe 0.41 →
+  out-of-sample −0.63 on the default seed) — exactly the gap in-sample-only backtests hide.
+  Point it at real data with `--csv`
 
-Up next: the first out-of-sample study on real data — fit the lookback on the train
-window, report Sharpe after costs on both windows.
+Up next: walk-forward evaluation (rolling refits instead of a single split) and
+multi-asset support.
 
 ## Getting started
 

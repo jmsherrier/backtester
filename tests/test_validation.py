@@ -10,7 +10,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backtester.validation import TrainTestSplit, split_by_date, split_by_fraction
+from backtester.signals import time_series_momentum
+from backtester.validation import (
+    TrainTestSplit,
+    out_of_sample_study,
+    split_by_date,
+    split_by_fraction,
+)
 
 
 def dated_returns(n: int = 100, seed: int = 7) -> pd.Series:
@@ -104,3 +110,70 @@ class TestPartitionInvariants:
 
     def test_no_shared_dates(self, split):
         assert split.train.index.intersection(split.test.index).empty
+
+
+def always(weight: float):
+    """Constant-weight signal builder, for studies with a known right answer."""
+    return lambda returns: pd.Series(weight, index=returns.index)
+
+
+class TestOutOfSampleStudy:
+    def test_empty_candidates_raise(self):
+        with pytest.raises(ValueError, match="empty"):
+            out_of_sample_study(dated_returns(), {})
+
+    def test_all_flat_candidates_raise(self):
+        # A flat strategy has zero volatility -> NaN Sharpe -> nothing to select.
+        with pytest.raises(ValueError, match="finite"):
+            out_of_sample_study(dated_returns(), {"flat": always(0.0)})
+
+    def test_selects_the_better_candidate_on_train(self):
+        # Strong positive drift: long beats short in-sample, decisively.
+        rng = np.random.default_rng(11)
+        returns = pd.Series(
+            rng.normal(0.002, 0.01, size=400),
+            index=pd.bdate_range("2021-01-01", periods=400),
+        )
+        result = out_of_sample_study(
+            returns, {"long": always(1.0), "short": always(-1.0)}
+        )
+        assert result.selected == "long"
+        assert result.train_scores["long"] > result.train_scores["short"]
+        assert set(result.train_scores) == {"long", "short"}
+
+    def test_windows_have_the_split_sizes(self):
+        returns = dated_returns(200)
+        result = out_of_sample_study(
+            returns, {"long": always(1.0)}, train_fraction=0.7
+        )
+        assert result.in_sample["n_periods"] == 140
+        assert result.out_of_sample["n_periods"] == 60
+
+    def test_signal_history_spans_the_split_boundary(self):
+        # A builder whose first 130 outputs are warm-up. The test window is
+        # only 120 periods long, so if the study (wrongly) rebuilt the signal
+        # from the test slice alone, the whole window would be flat and the
+        # out-of-sample Sharpe NaN. Built on the full history — as a real
+        # trader's signal would be — the test window is past warm-up.
+        def slow_warmup(returns: pd.Series) -> pd.Series:
+            signal = pd.Series(1.0, index=returns.index)
+            signal.iloc[:130] = 0.0
+            return signal
+
+        result = out_of_sample_study(
+            dated_returns(400), {"slow": slow_warmup}, train_fraction=0.7
+        )
+        assert np.isfinite(result.out_of_sample["sharpe_ratio"])
+
+    def test_runs_with_a_real_signal(self):
+        # End-to-end with momentum over a lookback grid: structural checks
+        # only — on random data the *values* are noise by design.
+        returns = dated_returns(500)
+        candidates = {
+            lookback: (lambda r, lb=lookback: time_series_momentum(r, lb))
+            for lookback in (10, 21, 63)
+        }
+        result = out_of_sample_study(returns, candidates)
+        assert result.selected in candidates
+        assert result.in_sample["max_drawdown"] <= 0.0
+        assert result.out_of_sample["n_periods"] == 150

@@ -11,9 +11,17 @@ from backtester.validation.split import (
     split_by_date,
     split_by_fraction,
 )
+from backtester.validation.study import (
+    SignalBuilder,
+    StudyResult,
+    out_of_sample_study,
+)
 
 __all__ = [
+    "SignalBuilder",
+    "StudyResult",
     "TrainTestSplit",
+    "out_of_sample_study",
     "split_by_date",
     "split_by_fraction",
 ]
