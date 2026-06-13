@@ -54,8 +54,12 @@ In development. Implemented so far:
 - **examples** — `momentum_study.py`: the full pipeline on synthetic random-walk data,
   where the correct answer is *no edge* — a built-in honesty check (run it:
   `python examples/momentum_study.py`, or point it at your own data with `--csv`)
+- **validation** — chronological train/test splits (`split_by_fraction`, `split_by_date`):
+  every train date precedes every test date, the pieces concatenate back to the original
+  exactly, and degenerate splits raise instead of returning in-sample data as "out-of-sample"
 
-Up next: train/test separation and the first out-of-sample study on real data.
+Up next: the first out-of-sample study on real data — fit the lookback on the train
+window, report Sharpe after costs on both windows.
 
 ## Getting started
 
