@@ -30,11 +30,12 @@ number so the degradation is visible rather than hidden.
 
 ```
 backtester/
-  data/         # price/return loading + universe construction
-  signals/      # strategy signal generators (momentum, mean-reversion, ...)
+  data/         # price/return loading + multi-asset return matrices
+  signals/      # strategy signal generators (time-series + cross-sectional)
   execution/    # transaction-cost and slippage models
-  engine/       # the core backtest loop: signals -> positions -> P&L
+  engine/       # the core backtest loop: signals -> positions -> P&L (single- and multi-asset)
   metrics/      # Sharpe, drawdown, turnover, hit rate, etc.
+  validation/   # train/test splits, out-of-sample + walk-forward studies
 tests/          # unit tests (lookahead checks, cost accounting, metric math)
 examples/       # runnable strategy studies with written conclusions
 ```
@@ -46,9 +47,13 @@ In development. Implemented so far:
 - **metrics** — annualized return/volatility, Sharpe, max drawdown, hit rate, turnover (unit tested)
 - **execution** — transaction-cost models: `ZeroCost` baseline and `BpsCost` (commission + slippage, unit tested)
 - **engine** — the core loop: signal → lagged position → gross → net returns. The no-lookahead
-  and cost-reconciliation guarantees are executable tests, not just claims
+  and cost-reconciliation guarantees are executable tests, not just claims. A multi-asset
+  variant (`run_portfolio_backtest`) runs a weight matrix against a return matrix — each asset
+  lagged and charged on its own notional, summed into one book that nets longs against shorts
 - **signals** — time-series momentum (trailing compounded return sign), with a
-  truncation-invariance test proving the signal at *t* cannot see past *t*
+  truncation-invariance test proving the signal at *t* cannot see past *t*; and
+  cross-sectional momentum, which ranks the assets against each other into a
+  dollar-neutral, unit-gross winners-minus-losers weight matrix (same no-lookahead proof)
 - **data** — strict CSV price loading (reject-don't-repair: no forward-fill, no silent
   dedup), price→return conversion (single asset or panel), and seeded GBM generators for
   runnable examples. Multi-asset return matrices via `align_returns` (rejects ragged panels
@@ -56,9 +61,10 @@ In development. Implemented so far:
 - **examples** — `momentum_study.py`: the full pipeline on synthetic random-walk data,
   where the correct answer is *no edge* — a built-in honesty check (run it:
   `python examples/momentum_study.py`, or point it at your own data with `--csv`)
-- **validation** — chronological train/test splits (`split_by_fraction`, `split_by_date`):
-  every train date precedes every test date, the pieces concatenate back to the original
-  exactly, and degenerate splits raise instead of returning in-sample data as "out-of-sample".
+- **validation** — chronological train/test splits (`split_by_fraction`, `split_by_date`,
+  accepting a single series or a multi-asset return matrix): every train date precedes every
+  test date, the pieces concatenate back to the original exactly, and degenerate splits raise
+  instead of returning in-sample data as "out-of-sample".
   Plus `out_of_sample_study`: select a candidate by net Sharpe on the train window, touch
   the test window exactly once, report both numbers so the degradation is the headline.
   And `walk_forward`: refit on each fold (expanding or rolling window) and stitch the
@@ -68,10 +74,13 @@ In development. Implemented so far:
   random-walk data and watches the "edge" evaporate out of sample (in-sample Sharpe 0.41 →
   out-of-sample −0.63 on the default seed). `walk_forward_study.py`: refits the lookback every
   quarter — the pick wanders fold to fold and the stitched out-of-sample Sharpe lands at −0.26
-  after costs, removing the luck of a single split. Both take real data via `--csv`
+  after costs, removing the luck of a single split. Both take real data via `--csv`.
+  `cross_sectional_study.py`: the full multi-asset pipeline (panel → ranking → portfolio
+  engine) on independent GBM assets, where a winners-minus-losers book has no spread to
+  find — another built-in honesty check
 
-Up next: cross-sectional signals (rank assets against each other) and a multi-asset
-engine that turns the return matrix into a long-short book.
+Up next: an out-of-sample / walk-forward study driven by the multi-asset engine, and
+real-data examples.
 
 ## Getting started
 

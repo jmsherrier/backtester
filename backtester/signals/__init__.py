@@ -5,8 +5,10 @@ desired target position for t+1. The critical invariant: a signal computed for
 date t may only use information observable on or before date t. Enforced by tests.
 """
 
+from backtester.signals.cross_sectional import cross_sectional_momentum
 from backtester.signals.momentum import time_series_momentum
 
 __all__ = [
+    "cross_sectional_momentum",
     "time_series_momentum",
 ]
