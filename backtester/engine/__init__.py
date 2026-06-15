@@ -7,8 +7,14 @@ date t come from positions decided using only data through t-1.
 """
 
 from backtester.engine.backtest import BacktestResult, run_backtest
+from backtester.engine.portfolio import (
+    PortfolioBacktestResult,
+    run_portfolio_backtest,
+)
 
 __all__ = [
     "BacktestResult",
+    "PortfolioBacktestResult",
     "run_backtest",
+    "run_portfolio_backtest",
 ]

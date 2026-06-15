@@ -46,7 +46,9 @@ In development. Implemented so far:
 - **metrics** — annualized return/volatility, Sharpe, max drawdown, hit rate, turnover (unit tested)
 - **execution** — transaction-cost models: `ZeroCost` baseline and `BpsCost` (commission + slippage, unit tested)
 - **engine** — the core loop: signal → lagged position → gross → net returns. The no-lookahead
-  and cost-reconciliation guarantees are executable tests, not just claims
+  and cost-reconciliation guarantees are executable tests, not just claims. A multi-asset
+  variant (`run_portfolio_backtest`) runs a weight matrix against a return matrix — each asset
+  lagged and charged on its own notional, summed into one book that nets longs against shorts
 - **signals** — time-series momentum (trailing compounded return sign), with a
   truncation-invariance test proving the signal at *t* cannot see past *t*; and
   cross-sectional momentum, which ranks the assets against each other into a
@@ -70,10 +72,13 @@ In development. Implemented so far:
   random-walk data and watches the "edge" evaporate out of sample (in-sample Sharpe 0.41 →
   out-of-sample −0.63 on the default seed). `walk_forward_study.py`: refits the lookback every
   quarter — the pick wanders fold to fold and the stitched out-of-sample Sharpe lands at −0.26
-  after costs, removing the luck of a single split. Both take real data via `--csv`
+  after costs, removing the luck of a single split. Both take real data via `--csv`.
+  `cross_sectional_study.py`: the full multi-asset pipeline (panel → ranking → portfolio
+  engine) on independent GBM assets, where a winners-minus-losers book has no spread to
+  find — another built-in honesty check
 
-Up next: a multi-asset engine that turns a weight matrix and a return matrix into a
-long-short book's P&L, with per-asset costs and the same no-lookahead lag.
+Up next: an out-of-sample / walk-forward study driven by the multi-asset engine, and
+real-data examples.
 
 ## Getting started
 
