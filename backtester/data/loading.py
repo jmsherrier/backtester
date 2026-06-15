@@ -66,19 +66,25 @@ def load_prices_csv(
     return prices
 
 
-def prices_to_returns(prices: pd.Series) -> pd.Series:
-    """Simple periodic returns from a price series.
+def prices_to_returns(prices: pd.Series | pd.DataFrame) -> pd.Series | pd.DataFrame:
+    """Simple periodic returns from a price series or panel.
 
-    The first period has no prior price and is dropped, not NaN-filled —
-    the result is ready for the engine, which rejects NaN by design.
+    Accepts a single asset (``Series``) or an aligned price panel
+    (``DataFrame``, one column per asset). The first period has no prior price
+    and is dropped, not NaN-filled — the result is ready for the engine, which
+    rejects NaN by design. For a panel, returns are computed per column, so the
+    columns must already be aligned on a shared date index (see
+    :func:`backtester.data.panel.align_returns`).
     """
-    if not isinstance(prices, pd.Series):
-        raise TypeError(f"prices must be a pandas Series, got {type(prices).__name__}")
+    if not isinstance(prices, (pd.Series, pd.DataFrame)):
+        raise TypeError(
+            f"prices must be a pandas Series or DataFrame, got {type(prices).__name__}"
+        )
     if len(prices) < 2:
         raise ValueError("need at least 2 prices to compute a return")
-    if prices.isna().any():
+    if prices.isna().to_numpy().any():
         raise ValueError("prices contains NaN value(s)")
-    if (prices <= 0).any():
+    if (prices <= 0).to_numpy().any():
         raise ValueError("prices must be strictly positive")
     return prices.astype(np.float64).pct_change().iloc[1:]
 

@@ -50,7 +50,9 @@ In development. Implemented so far:
 - **signals** — time-series momentum (trailing compounded return sign), with a
   truncation-invariance test proving the signal at *t* cannot see past *t*
 - **data** — strict CSV price loading (reject-don't-repair: no forward-fill, no silent
-  dedup), price→return conversion, and a seeded GBM generator for runnable examples
+  dedup), price→return conversion (single asset or panel), and seeded GBM generators for
+  runnable examples. Multi-asset return matrices via `align_returns` (rejects ragged panels
+  rather than fill or silently inner-join) and `common_window` (the explicit shared-date join)
 - **examples** — `momentum_study.py`: the full pipeline on synthetic random-walk data,
   where the correct answer is *no edge* — a built-in honesty check (run it:
   `python examples/momentum_study.py`, or point it at your own data with `--csv`)
@@ -68,7 +70,8 @@ In development. Implemented so far:
   quarter — the pick wanders fold to fold and the stitched out-of-sample Sharpe lands at −0.26
   after costs, removing the luck of a single split. Both take real data via `--csv`
 
-Up next: multi-asset support (cross-sectional signals and a return matrix).
+Up next: cross-sectional signals (rank assets against each other) and a multi-asset
+engine that turns the return matrix into a long-short book.
 
 ## Getting started
 
