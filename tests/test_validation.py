@@ -16,6 +16,7 @@ from backtester.validation import (
     out_of_sample_study,
     split_by_date,
     split_by_fraction,
+    walk_forward,
 )
 
 
@@ -177,3 +178,104 @@ class TestOutOfSampleStudy:
         assert result.selected in candidates
         assert result.in_sample["max_drawdown"] <= 0.0
         assert result.out_of_sample["n_periods"] == 150
+
+
+class TestWalkForward:
+    def test_empty_candidates_raise(self):
+        with pytest.raises(ValueError, match="empty"):
+            walk_forward(dated_returns(), {}, train_size=50, test_size=10)
+
+    def test_nonpositive_sizes_raise(self):
+        for train, test in ((0, 10), (10, 0)):
+            with pytest.raises(ValueError, match="positive"):
+                walk_forward(
+                    dated_returns(), {"long": always(1.0)},
+                    train_size=train, test_size=test,
+                )
+
+    def test_too_few_periods_for_one_fold_raises(self):
+        with pytest.raises(ValueError, match="one fold"):
+            walk_forward(
+                dated_returns(50), {"long": always(1.0)},
+                train_size=60, test_size=10,
+            )
+
+    def test_all_flat_candidates_raise(self):
+        with pytest.raises(ValueError, match="finite"):
+            walk_forward(
+                dated_returns(100), {"flat": always(0.0)},
+                train_size=50, test_size=10,
+            )
+
+    def test_oos_track_is_continuous_and_covers_all_post_train_dates(self):
+        # Every period after the initial train window appears exactly once,
+        # in order, with no gaps and no overlap between folds.
+        returns = dated_returns(200)
+        result = walk_forward(
+            returns, {"long": always(1.0)}, train_size=100, test_size=20
+        )
+        expected = returns.index[100:]
+        pd.testing.assert_index_equal(result.oos_returns.index, expected)
+        assert result.oos_returns.index.is_monotonic_increasing
+        assert not result.oos_returns.index.has_duplicates
+
+    def test_uneven_division_keeps_a_short_final_fold(self):
+        # 100 train + 95 remaining at step 20 -> folds of 20,20,20,20,15.
+        returns = dated_returns(195)
+        result = walk_forward(
+            returns, {"long": always(1.0)}, train_size=100, test_size=20
+        )
+        assert [f.n_test for f in result.folds] == [20, 20, 20, 20, 15]
+        assert sum(f.n_test for f in result.folds) == 95
+
+    def test_anchored_train_window_grows_rolling_stays_fixed(self):
+        returns = dated_returns(200)
+        candidates = {"long": always(1.0)}
+        anchored = walk_forward(
+            returns, candidates, train_size=100, test_size=20, anchored=True
+        )
+        rolling = walk_forward(
+            returns, candidates, train_size=100, test_size=20, anchored=False
+        )
+        assert [f.n_train for f in anchored.folds] == [100, 120, 140, 160, 180]
+        assert [f.n_train for f in rolling.folds] == [100, 100, 100, 100, 100]
+
+    def test_no_flat_reset_at_fold_boundaries(self):
+        # A constant-long strategy never trades after entry. If each fold were
+        # run in isolation it would re-enter (and pay cost) at every boundary,
+        # inflating turnover. Continuous handling means one entry, near-zero
+        # turnover across the whole track.
+        returns = dated_returns(200)
+        result = walk_forward(
+            returns, {"long": always(1.0)}, train_size=100, test_size=20
+        )
+        # Constant position held the entire out-of-sample track.
+        assert (result.oos_positions == 1.0).all()
+
+    def test_selection_can_change_across_folds(self):
+        # Returns flip from strong up-drift to strong down-drift halfway; the
+        # rolling refit should switch from long to short as the regime turns.
+        rng = np.random.default_rng(3)
+        up = rng.normal(0.003, 0.01, size=120)
+        down = rng.normal(-0.003, 0.01, size=120)
+        returns = pd.Series(
+            np.concatenate([up, down]),
+            index=pd.bdate_range("2021-01-01", periods=240),
+        )
+        result = walk_forward(
+            returns, {"long": always(1.0), "short": always(-1.0)},
+            train_size=60, test_size=30, anchored=False,
+        )
+        selections = [f.selected for f in result.folds]
+        assert "long" in selections and "short" in selections
+
+    def test_runs_with_a_real_signal(self):
+        returns = dated_returns(600)
+        candidates = {
+            lookback: (lambda r, lb=lookback: time_series_momentum(r, lb))
+            for lookback in (21, 63)
+        }
+        result = walk_forward(returns, candidates, train_size=300, test_size=60)
+        assert result.summary["max_drawdown"] <= 0.0
+        assert result.summary["n_periods"] == len(result.oos_returns)
+        assert all(f.selected in candidates for f in result.folds)

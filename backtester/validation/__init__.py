@@ -16,12 +16,20 @@ from backtester.validation.study import (
     StudyResult,
     out_of_sample_study,
 )
+from backtester.validation.walk_forward import (
+    Fold,
+    WalkForwardResult,
+    walk_forward,
+)
 
 __all__ = [
+    "Fold",
     "SignalBuilder",
     "StudyResult",
     "TrainTestSplit",
+    "WalkForwardResult",
     "out_of_sample_study",
     "split_by_date",
     "split_by_fraction",
+    "walk_forward",
 ]
