@@ -50,12 +50,28 @@ In development. Implemented so far:
 - **signals** — time-series momentum (trailing compounded return sign), with a
   truncation-invariance test proving the signal at *t* cannot see past *t*
 - **data** — strict CSV price loading (reject-don't-repair: no forward-fill, no silent
-  dedup), price→return conversion, and a seeded GBM generator for runnable examples
+  dedup), price→return conversion (single asset or panel), and seeded GBM generators for
+  runnable examples. Multi-asset return matrices via `align_returns` (rejects ragged panels
+  rather than fill or silently inner-join) and `common_window` (the explicit shared-date join)
 - **examples** — `momentum_study.py`: the full pipeline on synthetic random-walk data,
   where the correct answer is *no edge* — a built-in honesty check (run it:
   `python examples/momentum_study.py`, or point it at your own data with `--csv`)
+- **validation** — chronological train/test splits (`split_by_fraction`, `split_by_date`):
+  every train date precedes every test date, the pieces concatenate back to the original
+  exactly, and degenerate splits raise instead of returning in-sample data as "out-of-sample".
+  Plus `out_of_sample_study`: select a candidate by net Sharpe on the train window, touch
+  the test window exactly once, report both numbers so the degradation is the headline.
+  And `walk_forward`: refit on each fold (expanding or rolling window) and stitch the
+  untouched next blocks into one continuous out-of-sample track — every reported period
+  was chosen by a model that had not yet seen it, with no flat reset at fold boundaries
+- **examples** — `oos_momentum_study.py`: fits the momentum lookback in-sample on synthetic
+  random-walk data and watches the "edge" evaporate out of sample (in-sample Sharpe 0.41 →
+  out-of-sample −0.63 on the default seed). `walk_forward_study.py`: refits the lookback every
+  quarter — the pick wanders fold to fold and the stitched out-of-sample Sharpe lands at −0.26
+  after costs, removing the luck of a single split. Both take real data via `--csv`
 
-Up next: train/test separation and the first out-of-sample study on real data.
+Up next: cross-sectional signals (rank assets against each other) and a multi-asset
+engine that turns the return matrix into a long-short book.
 
 ## Getting started
 

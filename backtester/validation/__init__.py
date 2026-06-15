@@ -1,0 +1,35 @@
+"""Train/test separation and out-of-sample evaluation.
+
+Splits are always chronological — every train date precedes every test
+date — and the test window is meant to be touched exactly once, for the
+final report. The headline number this package exists to produce is the
+out-of-sample Sharpe after costs, shown next to the in-sample one.
+"""
+
+from backtester.validation.split import (
+    TrainTestSplit,
+    split_by_date,
+    split_by_fraction,
+)
+from backtester.validation.study import (
+    SignalBuilder,
+    StudyResult,
+    out_of_sample_study,
+)
+from backtester.validation.walk_forward import (
+    Fold,
+    WalkForwardResult,
+    walk_forward,
+)
+
+__all__ = [
+    "Fold",
+    "SignalBuilder",
+    "StudyResult",
+    "TrainTestSplit",
+    "WalkForwardResult",
+    "out_of_sample_study",
+    "split_by_date",
+    "split_by_fraction",
+    "walk_forward",
+]
