@@ -48,7 +48,9 @@ In development. Implemented so far:
 - **engine** — the core loop: signal → lagged position → gross → net returns. The no-lookahead
   and cost-reconciliation guarantees are executable tests, not just claims
 - **signals** — time-series momentum (trailing compounded return sign), with a
-  truncation-invariance test proving the signal at *t* cannot see past *t*
+  truncation-invariance test proving the signal at *t* cannot see past *t*; and
+  cross-sectional momentum, which ranks the assets against each other into a
+  dollar-neutral, unit-gross winners-minus-losers weight matrix (same no-lookahead proof)
 - **data** — strict CSV price loading (reject-don't-repair: no forward-fill, no silent
   dedup), price→return conversion (single asset or panel), and seeded GBM generators for
   runnable examples. Multi-asset return matrices via `align_returns` (rejects ragged panels
@@ -70,8 +72,8 @@ In development. Implemented so far:
   quarter — the pick wanders fold to fold and the stitched out-of-sample Sharpe lands at −0.26
   after costs, removing the luck of a single split. Both take real data via `--csv`
 
-Up next: cross-sectional signals (rank assets against each other) and a multi-asset
-engine that turns the return matrix into a long-short book.
+Up next: a multi-asset engine that turns a weight matrix and a return matrix into a
+long-short book's P&L, with per-asset costs and the same no-lookahead lag.
 
 ## Getting started
 
