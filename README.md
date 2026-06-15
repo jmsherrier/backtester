@@ -30,11 +30,12 @@ number so the degradation is visible rather than hidden.
 
 ```
 backtester/
-  data/         # price/return loading + universe construction
-  signals/      # strategy signal generators (momentum, mean-reversion, ...)
+  data/         # price/return loading + multi-asset return matrices
+  signals/      # strategy signal generators (time-series + cross-sectional)
   execution/    # transaction-cost and slippage models
-  engine/       # the core backtest loop: signals -> positions -> P&L
+  engine/       # the core backtest loop: signals -> positions -> P&L (single- and multi-asset)
   metrics/      # Sharpe, drawdown, turnover, hit rate, etc.
+  validation/   # train/test splits, out-of-sample + walk-forward studies
 tests/          # unit tests (lookahead checks, cost accounting, metric math)
 examples/       # runnable strategy studies with written conclusions
 ```
@@ -60,9 +61,10 @@ In development. Implemented so far:
 - **examples** — `momentum_study.py`: the full pipeline on synthetic random-walk data,
   where the correct answer is *no edge* — a built-in honesty check (run it:
   `python examples/momentum_study.py`, or point it at your own data with `--csv`)
-- **validation** — chronological train/test splits (`split_by_fraction`, `split_by_date`):
-  every train date precedes every test date, the pieces concatenate back to the original
-  exactly, and degenerate splits raise instead of returning in-sample data as "out-of-sample".
+- **validation** — chronological train/test splits (`split_by_fraction`, `split_by_date`,
+  accepting a single series or a multi-asset return matrix): every train date precedes every
+  test date, the pieces concatenate back to the original exactly, and degenerate splits raise
+  instead of returning in-sample data as "out-of-sample".
   Plus `out_of_sample_study`: select a candidate by net Sharpe on the train window, touch
   the test window exactly once, report both numbers so the degradation is the headline.
   And `walk_forward`: refit on each fold (expanding or rolling window) and stitch the

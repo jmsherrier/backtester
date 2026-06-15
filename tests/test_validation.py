@@ -10,7 +10,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backtester.signals import time_series_momentum
+from backtester.data import generate_gbm_panel, prices_to_returns
+from backtester.engine import run_portfolio_backtest
+from backtester.execution import BpsCost
+from backtester.signals import cross_sectional_momentum, time_series_momentum
 from backtester.validation import (
     TrainTestSplit,
     out_of_sample_study,
@@ -24,6 +27,12 @@ def dated_returns(n: int = 100, seed: int = 7) -> pd.Series:
     rng = np.random.default_rng(seed)
     index = pd.bdate_range("2021-01-01", periods=n)
     return pd.Series(rng.normal(0.0005, 0.01, size=n), index=index)
+
+
+def dated_panel(n_assets: int = 5, n: int = 200, seed: int = 7) -> pd.DataFrame:
+    return prices_to_returns(
+        generate_gbm_panel(n_assets=n_assets, n_periods=n + 1, seed=seed)
+    )
 
 
 class TestValidation:
@@ -279,3 +288,56 @@ class TestWalkForward:
         assert result.summary["max_drawdown"] <= 0.0
         assert result.summary["n_periods"] == len(result.oos_returns)
         assert all(f.selected in candidates for f in result.folds)
+
+
+class TestSplitPanel:
+    """The splitters partition a return matrix by date, keeping every column."""
+
+    def test_fraction_splits_a_dataframe_by_row(self):
+        panel = dated_panel(n_assets=5, n=200)
+        split = split_by_fraction(panel, train_fraction=0.7)
+        assert isinstance(split.train, pd.DataFrame)
+        assert split.n_train == 140 and split.n_test == 60
+        assert list(split.train.columns) == list(panel.columns)
+
+    def test_date_splits_a_dataframe_by_row(self):
+        panel = dated_panel(n_assets=4, n=200)
+        boundary = panel.index[119]
+        split = split_by_date(panel, boundary)
+        assert split.train.index[-1] == boundary
+        assert split.test.index[0] > boundary
+        assert split.train.shape[1] == split.test.shape[1] == 4
+
+    def test_panel_split_is_chronological_and_lossless(self):
+        panel = dated_panel(n_assets=6, n=250)
+        split = split_by_fraction(panel, train_fraction=0.6)
+        assert split.train.index.max() < split.test.index.min()
+        pd.testing.assert_frame_equal(pd.concat([split.train, split.test]), panel)
+
+    def test_unsorted_panel_raises(self):
+        with pytest.raises(ValueError, match="sorted"):
+            split_by_fraction(dated_panel(n=50).iloc[::-1])
+
+
+class TestMultiAssetStudyReadiness:
+    """Smoke test of the capability the next milestone needs: a chronological
+    split of a return matrix, the multi-asset engine evaluated once on the
+    held-out block. Proves the pieces compose before that study is built."""
+
+    def test_split_then_portfolio_backtest_on_held_out_block(self):
+        returns = dated_panel(n_assets=10, n=600, seed=3)
+        split = split_by_fraction(returns, train_fraction=0.7)
+
+        # Signal built on the full history (legitimately past at any test date),
+        # evaluated only over the held-out block — the same boundary discipline
+        # out_of_sample_study uses for the single-asset case.
+        signal = cross_sectional_momentum(returns, lookback=63)
+        result = run_portfolio_backtest(
+            split.test, signal.loc[split.test.index], BpsCost()
+        )
+        report = result.summary()
+        assert report["n_periods"] == split.n_test
+        assert report["max_drawdown"] <= 0.0
+        assert np.isfinite(report["sharpe_ratio"])
+        # Held-out block is dollar-neutral throughout (longs net against shorts).
+        assert np.allclose(result.positions.sum(axis=1).to_numpy(), 0.0)
