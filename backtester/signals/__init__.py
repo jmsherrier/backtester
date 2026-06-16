@@ -6,9 +6,11 @@ date t may only use information observable on or before date t. Enforced by test
 """
 
 from backtester.signals.cross_sectional import cross_sectional_momentum
+from backtester.signals.mean_reversion import mean_reversion
 from backtester.signals.momentum import time_series_momentum
 
 __all__ = [
     "cross_sectional_momentum",
+    "mean_reversion",
     "time_series_momentum",
 ]

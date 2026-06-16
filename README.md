@@ -51,9 +51,11 @@ In development. Implemented so far:
   variant (`run_portfolio_backtest`) runs a weight matrix against a return matrix — each asset
   lagged and charged on its own notional, summed into one book that nets longs against shorts
 - **signals** — time-series momentum (trailing compounded return sign), with a
-  truncation-invariance test proving the signal at *t* cannot see past *t*; and
+  truncation-invariance test proving the signal at *t* cannot see past *t*;
   cross-sectional momentum, which ranks the assets against each other into a
-  dollar-neutral, unit-gross winners-minus-losers weight matrix (same no-lookahead proof)
+  dollar-neutral, unit-gross winners-minus-losers weight matrix (same no-lookahead proof);
+  and mean-reversion, a Bollinger-style z-score that fades stretches from a trailing mean —
+  the natural opposite of momentum on a trend
 - **data** — strict CSV price loading (reject-don't-repair: no forward-fill, no silent
   dedup), price→return conversion (single asset or panel), and seeded GBM generators for
   runnable examples. Multi-asset return matrices via `align_returns` (rejects ragged panels
@@ -85,7 +87,8 @@ In development. Implemented so far:
   in-sample lookback pick degrade out of sample to a Sharpe with |t| < 2 (one panel's noise).
   The two cross-sectional examples take real data via `--csv-dir` (a folder of `<TICKER>.csv`)
 
-Up next: a mean-reversion signal and a documented real-data case study.
+Up next: a documented real-data case study (momentum vs mean-reversion, after costs,
+out of sample).
 
 ## Getting started
 
