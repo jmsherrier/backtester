@@ -33,10 +33,10 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from backtester.engine import run_backtest
 from backtester.execution.costs import BpsCost, CostModel
-from backtester.metrics.performance import sharpe_ratio, summary
-from backtester.validation.study import SignalBuilder
+from backtester.metrics.performance import TRADING_DAYS_PER_YEAR, sharpe_ratio, summary
+from backtester.validation.split import Data
+from backtester.validation.study import SignalBuilder, run_engine
 
 
 @dataclass(frozen=True)
@@ -61,22 +61,23 @@ class Fold:
 class WalkForwardResult:
     """The stitched out-of-sample track plus the per-fold selection history.
 
-    ``oos_returns`` and ``oos_positions`` are the concatenated out-of-sample
-    blocks across every fold — a single continuous series, never overlapping.
-    ``summary`` is the standard metric set on that series; its
-    ``sharpe_ratio`` is the headline walk-forward number. ``folds`` records
+    ``oos_returns`` is the concatenated portfolio net-return series across
+    every fold — a single continuous track, never overlapping. ``oos_positions``
+    is the matching held-position record (a Series for one asset, a weight
+    matrix for a panel). ``summary`` is the standard metric set on the track;
+    its ``sharpe_ratio`` is the headline walk-forward number. ``folds`` records
     what was selected at each step, so a drifting or unstable selection is
     visible rather than averaged away.
     """
 
     oos_returns: pd.Series
-    oos_positions: pd.Series
+    oos_positions: Data
     summary: dict[str, float]
     folds: list[Fold]
 
 
 def walk_forward(
-    returns: pd.Series,
+    returns: Data,
     candidates: Mapping[Hashable, SignalBuilder],
     train_size: int,
     test_size: int,
@@ -88,8 +89,11 @@ def walk_forward(
 
     Parameters
     ----------
-    returns : pd.Series
-        Periodic simple returns of the traded asset, sorted ascending.
+    returns : pd.Series | pd.DataFrame
+        Periodic simple returns, sorted ascending — a single asset (Series) or
+        an aligned return matrix (DataFrame); the matching engine is chosen
+        automatically, as in
+        :func:`backtester.validation.study.out_of_sample_study`.
     candidates : Mapping[Hashable, SignalBuilder]
         Label -> signal builder, as in
         :func:`backtester.validation.study.out_of_sample_study`.
@@ -128,8 +132,10 @@ def walk_forward(
             f"train_size and test_size must be positive, got "
             f"train_size={train_size}, test_size={test_size}"
         )
-    if not isinstance(returns, pd.Series):
-        raise TypeError(f"returns must be a pandas Series, got {type(returns).__name__}")
+    if not isinstance(returns, (pd.Series, pd.DataFrame)):
+        raise TypeError(
+            f"returns must be a pandas Series or DataFrame, got {type(returns).__name__}"
+        )
     if not returns.index.is_monotonic_increasing:
         raise ValueError("returns index must be sorted ascending")
     n = len(returns)
@@ -142,7 +148,7 @@ def walk_forward(
         cost_model = BpsCost()
 
     oos_returns_blocks: list[pd.Series] = []
-    oos_positions_blocks: list[pd.Series] = []
+    oos_positions_blocks: list[Data] = []
     folds: list[Fold] = []
 
     train_end = train_size
@@ -158,9 +164,7 @@ def walk_forward(
         # slice to the test block: the position held on the first test day is
         # the one carried in from the last train day, not an artificial reset.
         signal_through_fold = candidates[selected](returns.iloc[:test_end])
-        result = run_backtest(
-            returns.iloc[:test_end], signal_through_fold, cost_model
-        )
+        result = run_engine(returns.iloc[:test_end], signal_through_fold, cost_model)
         block_returns = result.net_returns.loc[test_index]
         block_positions = result.positions.loc[test_index]
 
@@ -191,13 +195,13 @@ def walk_forward(
 
 
 def _select(
-    train: pd.Series,
+    train: Data,
     candidates: Mapping[Hashable, SignalBuilder],
     cost_model: CostModel,
 ) -> Hashable:
     """Pick the candidate with the best finite net Sharpe on the train window."""
     scores = {
-        label: run_backtest(train, build(train), cost_model).summary()["sharpe_ratio"]
+        label: run_engine(train, build(train), cost_model).summary()["sharpe_ratio"]
         for label, build in candidates.items()
     }
     finite = {label: s for label, s in scores.items() if np.isfinite(s)}
@@ -209,6 +213,18 @@ def _select(
     return max(finite, key=finite.__getitem__)
 
 
-def _summarize(oos_returns: pd.Series, oos_positions: pd.Series) -> dict[str, float]:
-    """Standard metric set on the stitched out-of-sample series."""
-    return summary(oos_returns, positions=oos_positions)
+def _summarize(oos_returns: pd.Series, oos_positions: Data) -> dict[str, float]:
+    """Standard metric set on the stitched out-of-sample track.
+
+    Turnover is computed from the held positions: for a single asset the
+    one-way change in weight, for a panel the summed absolute change across all
+    assets (so rebalancing every leg counts). The first period is an entry from
+    flat, matching :func:`backtester.metrics.performance.turnover`.
+    """
+    if not isinstance(oos_positions, pd.DataFrame):
+        return summary(oos_returns, positions=oos_positions)
+    report = summary(oos_returns)
+    trades = oos_positions.diff()
+    trades.iloc[0] = oos_positions.iloc[0]
+    report["turnover"] = float(trades.abs().sum(axis=1).mean()) * TRADING_DAYS_PER_YEAR
+    return report

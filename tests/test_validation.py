@@ -341,3 +341,105 @@ class TestMultiAssetStudyReadiness:
         assert np.isfinite(report["sharpe_ratio"])
         # Held-out block is dollar-neutral throughout (longs net against shorts).
         assert np.allclose(result.positions.sum(axis=1).to_numpy(), 0.0)
+
+
+def fixed_book(weights: dict) -> object:
+    """A builder emitting a constant weight matrix (one fixed book over time)."""
+
+    def build(returns: pd.DataFrame) -> pd.DataFrame:
+        book = pd.DataFrame(0.0, index=returns.index, columns=returns.columns)
+        for column, weight in weights.items():
+            book[column] = weight
+        return book
+
+    return build
+
+
+def drifting_panel(seed: int = 5) -> pd.DataFrame:
+    """A two-asset panel where A drifts up and B drifts down."""
+    rng = np.random.default_rng(seed)
+    index = pd.bdate_range("2021-01-01", periods=400)
+    return pd.DataFrame(
+        {
+            "A": rng.normal(0.002, 0.01, size=400),
+            "B": rng.normal(-0.002, 0.01, size=400),
+        },
+        index=index,
+    )
+
+
+class TestOutOfSampleStudyPanel:
+    """out_of_sample_study driven by the multi-asset engine."""
+
+    def test_selects_the_winning_book_in_sample(self):
+        # Long-A/short-B profits while its mirror loses; the study must pick it.
+        returns = drifting_panel()
+        candidates = {
+            "long_A": fixed_book({"A": 0.5, "B": -0.5}),
+            "long_B": fixed_book({"A": -0.5, "B": 0.5}),
+        }
+        result = out_of_sample_study(returns, candidates, train_fraction=0.7)
+        assert result.selected == "long_A"
+        assert result.train_scores["long_A"] > result.train_scores["long_B"]
+
+    def test_reports_both_windows_with_book_turnover(self):
+        returns = dated_panel(n_assets=10, n=500, seed=2)
+        candidates = {
+            lb: (lambda r, lb=lb: cross_sectional_momentum(r, lookback=lb))
+            for lb in (21, 63)
+        }
+        result = out_of_sample_study(returns, candidates, train_fraction=0.7)
+        assert result.selected in candidates
+        assert result.in_sample["n_periods"] == 350
+        assert result.out_of_sample["n_periods"] == 150
+        assert "turnover" in result.out_of_sample
+        assert np.isfinite(result.out_of_sample["sharpe_ratio"])
+
+    def test_no_edge_on_independent_panel(self):
+        # The honesty check at study level: independent assets, so the held-out
+        # cross-sectional Sharpe is within noise of zero.
+        returns = dated_panel(n_assets=12, n=1500, seed=0)
+        candidates = {
+            lb: (lambda r, lb=lb: cross_sectional_momentum(r, lookback=lb))
+            for lb in (21, 63, 126)
+        }
+        result = out_of_sample_study(returns, candidates)
+        assert abs(result.out_of_sample["sharpe_ratio"]) < 1.0
+
+
+class TestWalkForwardPanel:
+    """walk_forward driven by the multi-asset engine."""
+
+    def test_oos_positions_is_a_matrix_covering_post_train_dates(self):
+        returns = dated_panel(n_assets=8, n=600, seed=1)
+        candidates = {
+            lb: (lambda r, lb=lb: cross_sectional_momentum(r, lookback=lb))
+            for lb in (21, 63)
+        }
+        result = walk_forward(returns, candidates, train_size=300, test_size=60)
+        assert isinstance(result.oos_positions, pd.DataFrame)
+        assert list(result.oos_positions.columns) == list(returns.columns)
+        pd.testing.assert_index_equal(result.oos_returns.index, returns.index[300:])
+        assert result.summary["n_periods"] == len(result.oos_returns)
+
+    def test_book_turnover_sums_both_legs(self):
+        returns = dated_panel(n_assets=8, n=600, seed=1)
+        candidates = {63: (lambda r: cross_sectional_momentum(r, lookback=63))}
+        result = walk_forward(returns, candidates, train_size=300, test_size=60)
+        positions = result.oos_positions
+        trades = positions.diff()
+        trades.iloc[0] = positions.iloc[0]
+        expected = trades.abs().sum(axis=1).mean() * 252
+        assert result.summary["turnover"] == pytest.approx(expected)
+
+    def test_selection_can_switch_with_the_winning_book(self):
+        returns = drifting_panel()
+        candidates = {
+            "long_A": fixed_book({"A": 0.5, "B": -0.5}),
+            "long_B": fixed_book({"A": -0.5, "B": 0.5}),
+        }
+        result = walk_forward(returns, candidates, train_size=100, test_size=50)
+        # A persistently beats B, so long_A should be the dominant pick across
+        # refits (an occasional noisy train window may still flip a single fold).
+        picks = [fold.selected for fold in result.folds]
+        assert picks.count("long_A") > picks.count("long_B")
