@@ -14,6 +14,7 @@ from backtester.data import (
     align_returns,
     common_window,
     generate_gbm_panel,
+    load_price_panel,
     prices_to_returns,
 )
 
@@ -21,6 +22,10 @@ from backtester.data import (
 def dated(values, start="2021-01-04") -> pd.Series:
     index = pd.bdate_range(start, periods=len(values))
     return pd.Series(values, index=index, dtype=np.float64)
+
+
+def write_price_csv(directory, ticker: str, rows: str) -> None:
+    (directory / f"{ticker}.csv").write_text("Date,Close\n" + rows)
 
 
 class TestAlignReturns:
@@ -154,3 +159,37 @@ class TestPricesToReturnsPanel:
         prices = pd.DataFrame({"A": [100.0, -1.0]})
         with pytest.raises(ValueError, match="positive"):
             prices_to_returns(prices)
+
+
+class TestLoadPricePanel:
+    def test_loads_each_file_keyed_by_stem(self, tmp_path):
+        write_price_csv(tmp_path, "AAPL", "2024-01-02,100\n2024-01-03,101\n")
+        write_price_csv(tmp_path, "MSFT", "2024-01-02,50\n2024-01-03,49\n")
+        panel = load_price_panel(tmp_path)
+        assert set(panel) == {"AAPL", "MSFT"}
+        assert isinstance(panel["AAPL"], pd.Series)
+        assert panel["AAPL"].iloc[-1] == 101.0
+
+    def test_missing_directory_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="not a directory"):
+            load_price_panel(tmp_path / "nope")
+
+    def test_no_matching_files_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="no files matching"):
+            load_price_panel(tmp_path)
+
+    def test_one_bad_file_fails_loudly(self, tmp_path):
+        write_price_csv(tmp_path, "GOOD", "2024-01-02,100\n2024-01-03,101\n")
+        write_price_csv(tmp_path, "BAD", "2024-01-02,100\n2024-01-02,101\n")  # dup date
+        with pytest.raises(ValueError, match="duplicate dates"):
+            load_price_panel(tmp_path)
+
+    def test_composes_into_a_return_matrix(self, tmp_path):
+        # The intended real-data path: load -> per-asset returns -> common_window.
+        write_price_csv(tmp_path, "A", "2024-01-02,100\n2024-01-03,110\n2024-01-04,99\n")
+        write_price_csv(tmp_path, "B", "2024-01-02,50\n2024-01-03,55\n2024-01-04,55\n")
+        prices = load_price_panel(tmp_path)
+        returns = common_window({t: prices_to_returns(p) for t, p in prices.items()})
+        assert list(returns.columns) == ["A", "B"]
+        assert returns.shape == (2, 2)
+        assert returns["A"].tolist() == pytest.approx([0.10, -0.10])

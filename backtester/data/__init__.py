@@ -15,6 +15,7 @@ from backtester.data.panel import (
     align_returns,
     common_window,
     generate_gbm_panel,
+    load_price_panel,
 )
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "common_window",
     "generate_gbm_panel",
     "generate_gbm_prices",
+    "load_price_panel",
     "load_prices_csv",
     "prices_to_returns",
 ]

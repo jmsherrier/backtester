@@ -57,7 +57,8 @@ In development. Implemented so far:
 - **data** — strict CSV price loading (reject-don't-repair: no forward-fill, no silent
   dedup), price→return conversion (single asset or panel), and seeded GBM generators for
   runnable examples. Multi-asset return matrices via `align_returns` (rejects ragged panels
-  rather than fill or silently inner-join) and `common_window` (the explicit shared-date join)
+  rather than fill or silently inner-join) and `common_window` (the explicit shared-date join);
+  `load_price_panel` strict-loads a directory of `<TICKER>.csv` files (alignment left explicit)
 - **examples** — `momentum_study.py`: the full pipeline on synthetic random-walk data,
   where the correct answer is *no edge* — a built-in honesty check (run it:
   `python examples/momentum_study.py`, or point it at your own data with `--csv`)
@@ -81,10 +82,10 @@ In development. Implemented so far:
   engine) on independent GBM assets, where a winners-minus-losers book has no spread to
   find — another built-in honesty check. `cross_sectional_oos_study.py`: the same book run
   through both validation studies — a single 70/30 split and a walk-forward — showing the
-  in-sample lookback pick degrade out of sample to a Sharpe with |t| < 2 (one panel's noise)
+  in-sample lookback pick degrade out of sample to a Sharpe with |t| < 2 (one panel's noise).
+  The two cross-sectional examples take real data via `--csv-dir` (a folder of `<TICKER>.csv`)
 
-Up next: real-data examples — load a directory of price CSVs into a panel and run the
-multi-asset studies on it.
+Up next: a mean-reversion signal and a documented real-data case study.
 
 ## Getting started
 

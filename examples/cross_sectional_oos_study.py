@@ -17,14 +17,23 @@ by chance — what the study shows is that it is not statistically distinguishab
 from zero (the printed t-statistic is well under 2) and that the in-sample edge
 degrades. A *significant* edge here would mean the framework is leaking.
 
+Run on synthetic data (default) or a folder of real price CSVs, one
+``<TICKER>.csv`` (Date,Close) per asset:
+
     python examples/cross_sectional_oos_study.py
+    python examples/cross_sectional_oos_study.py --csv-dir path/to/prices/
 """
 
 from __future__ import annotations
 
 import argparse
 
-from backtester.data import generate_gbm_panel, prices_to_returns
+from backtester.data import (
+    common_window,
+    generate_gbm_panel,
+    load_price_panel,
+    prices_to_returns,
+)
 from backtester.signals import cross_sectional_momentum
 from backtester.validation import out_of_sample_study, walk_forward
 
@@ -43,14 +52,26 @@ def candidates() -> dict:
     }
 
 
+def load_returns(args) -> tuple:
+    """Return (return matrix, source label, is_synthetic) from the CLI args."""
+    if args.csv_dir:
+        prices = load_price_panel(args.csv_dir)
+        returns = common_window({t: prices_to_returns(p) for t, p in prices.items()})
+        return returns, f"{args.csv_dir} ({returns.shape[1]} assets)", False
+    prices = generate_gbm_panel(n_assets=args.assets, n_periods=2520, seed=0)
+    returns = prices_to_returns(prices)
+    return returns, f"{args.assets} independent GBM assets (seed 0)", True
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--csv-dir", help="folder of <TICKER>.csv price files; default: synthetic GBM"
+    )
     parser.add_argument("--assets", type=int, default=20)
     args = parser.parse_args()
 
-    prices = generate_gbm_panel(n_assets=args.assets, n_periods=2520, seed=0)
-    returns = prices_to_returns(prices)
-    source = f"{args.assets} independent GBM assets (seed 0) -- no cross-sectional structure"
+    returns, source, is_synthetic = load_returns(args)
 
     print(f"data:      {source}")
     print(
@@ -86,13 +107,14 @@ def main() -> None:
         f"Sharpe (after cost) {report['sharpe_ratio']:>6.2f} (t = {t_stat:.2f}), "
         f"max dd {report['max_drawdown']:.2%}, turnover {report['turnover']:.1f}"
     )
-    print(
-        "\nconclusion: there is no real spread between winners and losers on an\n"
-        "independent panel, so the in-sample pick degrades out of sample and the\n"
-        "walk-forward track's Sharpe is not statistically distinguishable from zero\n"
-        "(|t| well under 2). That is the CORRECT result -- a *significant* multi-asset\n"
-        "edge here would be exposing a bug, not alpha."
-    )
+    if is_synthetic:
+        print(
+            "\nconclusion: there is no real spread between winners and losers on an\n"
+            "independent panel, so the in-sample pick degrades out of sample and the\n"
+            "walk-forward track's Sharpe is not statistically distinguishable from zero\n"
+            "(|t| well under 2). That is the CORRECT result -- a *significant* multi-asset\n"
+            "edge here would be exposing a bug, not alpha."
+        )
 
 
 if __name__ == "__main__":

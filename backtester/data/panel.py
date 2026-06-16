@@ -17,9 +17,63 @@ way to get a clean panel from assets with different histories is
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from backtester.data.loading import load_prices_csv
+
+
+def load_price_panel(
+    directory: str | Path,
+    pattern: str = "*.csv",
+    date_column: str = "Date",
+    price_column: str = "Close",
+) -> dict[str, pd.Series]:
+    """Strict-load every price CSV in a directory, keyed by file stem (ticker).
+
+    Each file is loaded by :func:`backtester.data.loading.load_prices_csv`, so
+    the same per-file contract holds — parseable dates, no duplicate dates, no
+    NaN, strictly positive prices — and a single bad file fails loudly rather
+    than quietly dropping an asset.
+
+    Deliberately stops at loading: it returns one price ``Series`` per ticker
+    and does *not* align them. Assets list and delist at different times, and
+    forcing a rectangle is a decision with consequences (drop dates? whose
+    calendar?), so alignment stays an explicit caller step — convert each
+    series with :func:`prices_to_returns` and combine with :func:`align_returns`
+    (strict) or :func:`common_window` (shared-date intersection).
+
+    Parameters
+    ----------
+    directory : str | Path
+        Folder of price CSVs; each file's stem becomes its ticker (so
+        ``AAPL.csv`` -> ``"AAPL"``).
+    pattern : str
+        Glob for the files to include (default ``"*.csv"``).
+    date_column, price_column : str
+        Column names passed through to ``load_prices_csv``.
+
+    Returns
+    -------
+    dict[str, pd.Series]
+        Ticker -> price series, sorted by ticker for a stable column order.
+
+    Raises
+    ------
+    ValueError
+        If ``directory`` is not a directory, or no file matches ``pattern``.
+    """
+    directory = Path(directory)
+    if not directory.is_dir():
+        raise ValueError(f"not a directory: {directory}")
+    paths = sorted(directory.glob(pattern))
+    if not paths:
+        raise ValueError(f"no files matching '{pattern}' in {directory}")
+    return {
+        path.stem: load_prices_csv(path, date_column, price_column) for path in paths
+    }
 
 
 def _validate_asset_series(returns: pd.Series, asset: str) -> pd.Series:
