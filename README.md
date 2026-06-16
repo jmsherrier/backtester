@@ -69,7 +69,9 @@ In development. Implemented so far:
   the test window exactly once, report both numbers so the degradation is the headline.
   And `walk_forward`: refit on each fold (expanding or rolling window) and stitch the
   untouched next blocks into one continuous out-of-sample track — every reported period
-  was chosen by a model that had not yet seen it, with no flat reset at fold boundaries
+  was chosen by a model that had not yet seen it, with no flat reset at fold boundaries.
+  Both studies run single- or multi-asset: pass a return series, or a return matrix with
+  builders that emit a weight matrix (a cross-sectional book), and the engine is chosen by type
 - **examples** — `oos_momentum_study.py`: fits the momentum lookback in-sample on synthetic
   random-walk data and watches the "edge" evaporate out of sample (in-sample Sharpe 0.41 →
   out-of-sample −0.63 on the default seed). `walk_forward_study.py`: refits the lookback every
@@ -77,10 +79,12 @@ In development. Implemented so far:
   after costs, removing the luck of a single split. Both take real data via `--csv`.
   `cross_sectional_study.py`: the full multi-asset pipeline (panel → ranking → portfolio
   engine) on independent GBM assets, where a winners-minus-losers book has no spread to
-  find — another built-in honesty check
+  find — another built-in honesty check. `cross_sectional_oos_study.py`: the same book run
+  through both validation studies — a single 70/30 split and a walk-forward — showing the
+  in-sample lookback pick degrade out of sample to a Sharpe with |t| < 2 (one panel's noise)
 
-Up next: an out-of-sample / walk-forward study driven by the multi-asset engine, and
-real-data examples.
+Up next: real-data examples — load a directory of price CSVs into a panel and run the
+multi-asset studies on it.
 
 ## Getting started
 
