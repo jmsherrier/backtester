@@ -85,10 +85,12 @@ In development. Implemented so far:
   find — another built-in honesty check. `cross_sectional_oos_study.py`: the same book run
   through both validation studies — a single 70/30 split and a walk-forward — showing the
   in-sample lookback pick degrade out of sample to a Sharpe with |t| < 2 (one panel's noise).
-  The two cross-sectional examples take real data via `--csv-dir` (a folder of `<TICKER>.csv`)
+  The two cross-sectional examples take real data via `--csv-dir` (a folder of `<TICKER>.csv`).
+  `momentum_vs_reversion.py`: the two signal families compete as candidates in one
+  out-of-sample + walk-forward study — whichever wins in-sample is judged after costs out of
+  sample; on a random walk both degrade to noise, so point it at real prices with `--csv`
 
-Up next: a documented real-data case study (momentum vs mean-reversion, after costs,
-out of sample).
+Up next: volatility-targeted position sizing (signals currently size at ±1).
 
 ## Getting started
 
