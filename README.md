@@ -12,9 +12,9 @@ and to be transparent when it would not.
 
 ## Why this exists
 
-Avoiding: using lookahead information, ignoring transaction
-costs, or reporting in-sample performance as if it were predictive. This engine is built to
-make those mistakes hard:
+Most backtests flatter a strategy in three ways: they use information that wasn't available
+yet, they ignore transaction costs, and they report in-sample performance as if it were
+predictive. This engine is built to make those mistakes hard:
 
 - **No lookahead by construction** — signals at time *t* may only use data available at *t*.
 - **Costs are not optional** — every fill pays commission and slippage.
@@ -40,52 +40,35 @@ tests/          # unit tests (lookahead checks, cost accounting, metric math)
 examples/       # runnable strategy studies with written conclusions
 ```
 
-## Status
+## Results so far
 
-In development. Implemented so far:
+The included studies run on synthetic random-walk data, where the correct answer is *no edge*,
+so they double as honesty checks. Each takes real prices via `--csv` (or `--csv-dir` for a
+folder of `<TICKER>.csv` files).
 
-- **metrics** — annualized return/volatility, Sharpe, max drawdown, hit rate, turnover (unit tested)
-- **execution** — transaction-cost models: `ZeroCost` baseline and `BpsCost` (commission + slippage, unit tested)
-- **engine** — the core loop: signal → lagged position → gross → net returns. The no-lookahead
-  and cost-reconciliation guarantees are executable tests, not just claims. A multi-asset
-  variant (`run_portfolio_backtest`) runs a weight matrix against a return matrix — each asset
-  lagged and charged on its own notional, summed into one book that nets longs against shorts
-- **signals** — time-series momentum (trailing compounded return sign), with a
-  truncation-invariance test proving the signal at *t* cannot see past *t*; and
-  cross-sectional momentum, which ranks the assets against each other into a
-  dollar-neutral, unit-gross winners-minus-losers weight matrix (same no-lookahead proof)
-- **data** — strict CSV price loading (reject-don't-repair: no forward-fill, no silent
-  dedup), price→return conversion (single asset or panel), and seeded GBM generators for
-  runnable examples. Multi-asset return matrices via `align_returns` (rejects ragged panels
-  rather than fill or silently inner-join) and `common_window` (the explicit shared-date join);
-  `load_price_panel` strict-loads a directory of `<TICKER>.csv` files (alignment left explicit)
-- **examples** — `momentum_study.py`: the full pipeline on synthetic random-walk data,
-  where the correct answer is *no edge* — a built-in honesty check (run it:
-  `python examples/momentum_study.py`, or point it at your own data with `--csv`)
-- **validation** — chronological train/test splits (`split_by_fraction`, `split_by_date`,
-  accepting a single series or a multi-asset return matrix): every train date precedes every
-  test date, the pieces concatenate back to the original exactly, and degenerate splits raise
-  instead of returning in-sample data as "out-of-sample".
-  Plus `out_of_sample_study`: select a candidate by net Sharpe on the train window, touch
-  the test window exactly once, report both numbers so the degradation is the headline.
-  And `walk_forward`: refit on each fold (expanding or rolling window) and stitch the
-  untouched next blocks into one continuous out-of-sample track — every reported period
-  was chosen by a model that had not yet seen it, with no flat reset at fold boundaries.
-  Both studies run single- or multi-asset: pass a return series, or a return matrix with
-  builders that emit a weight matrix (a cross-sectional book), and the engine is chosen by type
-- **examples** — `oos_momentum_study.py`: fits the momentum lookback in-sample on synthetic
-  random-walk data and watches the "edge" evaporate out of sample (in-sample Sharpe 0.41 →
-  out-of-sample −0.63 on the default seed). `walk_forward_study.py`: refits the lookback every
-  quarter — the pick wanders fold to fold and the stitched out-of-sample Sharpe lands at −0.26
-  after costs, removing the luck of a single split. Both take real data via `--csv`.
-  `cross_sectional_study.py`: the full multi-asset pipeline (panel → ranking → portfolio
-  engine) on independent GBM assets, where a winners-minus-losers book has no spread to
-  find — another built-in honesty check. `cross_sectional_oos_study.py`: the same book run
-  through both validation studies — a single 70/30 split and a walk-forward — showing the
-  in-sample lookback pick degrade out of sample to a Sharpe with |t| < 2 (one panel's noise).
-  The two cross-sectional examples take real data via `--csv-dir` (a folder of `<TICKER>.csv`)
+| Study | What it shows |
+| --- | --- |
+| `oos_momentum_study.py` | Momentum lookback fit in-sample: Sharpe **0.41 in-sample → −0.63 out of sample** |
+| `walk_forward_study.py` | Quarterly refits; the chosen lookback wanders and stitched OOS Sharpe lands at **−0.26** after costs |
+| `cross_sectional_oos_study.py` | Winners-minus-losers book degrades out of sample to \|t\| < 2, i.e. noise |
+| `momentum_vs_reversion.py` | Momentum and mean-reversion compete in one study; the in-sample winner is judged after costs out of sample |
 
-Up next: a mean-reversion signal and a documented real-data case study.
+## What's implemented
+
+- **engine**: signal → lagged position → gross → net returns, single-asset and multi-asset
+  (`run_portfolio_backtest`, each asset charged on its own notional). The no-lookahead and
+  cost-reconciliation guarantees are executable tests.
+- **signals**: time-series momentum, cross-sectional momentum (dollar-neutral, unit-gross), and
+  Bollinger-style mean reversion, each with a truncation-invariance test proving the signal at
+  *t* cannot see past *t*.
+- **execution**: `ZeroCost` baseline and `BpsCost` (commission + slippage).
+- **metrics**: annualized return and volatility, Sharpe, max drawdown, hit rate, turnover.
+- **data**: strict CSV loading that rejects bad data instead of repairing it (no forward-fill,
+  no silent dedup or inner-join), price panels, and seeded GBM generators.
+- **validation**: chronological train/test splits, a one-shot out-of-sample study, and
+  walk-forward (expanding or rolling) that stitches untouched folds into one OOS track.
+
+Up next: volatility-targeted position sizing (signals currently size at ±1).
 
 ## Getting started
 
@@ -102,4 +85,4 @@ Python 3.12 · NumPy · Pandas · pytest
 
 ## License
 
-MIT
+[MIT](LICENSE)
